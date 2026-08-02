@@ -1,0 +1,4141 @@
+{
+  "_comment": "등각도 2D 심볼 형상 라이브러리 — 요소는 Verso Scene2D Element 형식(local 좌표). 좌표계·등각 배치 규약은 docs/symbol-set.md 참조",
+  "version": "2.0",
+  "primitiveFormat": {
+    "_comment": "Verso src/types/scene2d.ts 의 Element 서브셋을 그대로 쓴다",
+    "types": [
+      "line",
+      "polyline",
+      "polygon",
+      "rect",
+      "circle",
+      "ellipse",
+      "arc",
+      "text"
+    ],
+    "localCoords": "심볼 로컬 좌표. +X = 배관 진행 방향, 원점 = 컴포넌트 중심. 1.0 = 1 symbolUnit",
+    "angleUnits": "arc 의 startAngle/endAngle 는 라디안 (Verso ArcElement 규약). ellipse/text 의 rotation 은 도.",
+    "role": {
+      "_comment": "Scene2D.styles[] 공유 스타일로 매핑되는 역할. 색/굵기는 도면 스타일 설정이 정한다.",
+      "outline": "윤곽선만 (stroke)",
+      "solid": "윤곽선 + 채움 (stroke + fill)",
+      "hidden": "파선 (stroke.dash)",
+      "text": "문자 (font)"
+    },
+    "plane": {
+      "_comment": "등각 배치 시 이 요소를 어느 평면에 둘지",
+      "iso": "배관 축을 포함하는 등각 평면에 놓고 투영한다(기울어짐). 기본값.",
+      "screen": "화면 기준을 유지한다 — 용접점 마커, 태그 문자, 노스 애로우 등"
+    }
+  },
+  "coordinateSystem": {
+    "origin": "컴포넌트 중심(인라인) 또는 포트 위치(엔드 트리트먼트)",
+    "xAxis": "배관 진행 방향(run axis). 심볼은 X ∈ [-1, +1] 안에 정규화",
+    "yAxis": "run 에 직교. 등각 투영 후 화면상 '위'쪽",
+    "unit": "symbolUnit — 스타일 설정값(기본 3.5mm). 좌표 1.0 = 1 symbolUnit",
+    "note": "렌더러가 실제 투영 방향으로 회전 후 배치한다. 심볼 자체는 방향을 모른다."
+  },
+  "isometricPlacement": {
+    "_comment": "심볼 로컬 좌표 → 도면 좌표 변환. 엔진이 계산해 기하에 구워 넣는다.",
+    "axes": {
+      "_comment": "세계 축의 등각 투영 방향(화면 y-up). 프로젝트 설정으로 교체 가능.",
+      "E": [
+        0.8660254,
+        -0.5
+      ],
+      "N": [
+        -0.8660254,
+        -0.5
+      ],
+      "U": [
+        0.0,
+        1.0
+      ]
+    },
+    "steps": [
+      "1. u = 배관 진행 방향 3D 단위벡터",
+      "2. v = 심볼 평면의 up 3D 단위벡터. 아래 planeUpRule 참조",
+      "3. ex = P(u), ey = P(v)  — P 는 axes 로 정의된 등각 투영",
+      "4. affine = [ex.x·s, ex.y·s, ey.x·s, ey.y·s, P(C).x, P(C).y]   (s = symbolUnit, C = 컴포넌트 중심)",
+      "5. plane=iso 요소는 이 affine 을 기하에 구워 넣고, plane=screen 요소는 원점만 옮긴다"
+    ],
+    "bakingRules": {
+      "_comment": "Verso 렌더러는 임의 affine 을 적용하지 않으므로(회전도 기하에 구워 넣는다) 엔진이 직접 변환한다",
+      "line_polyline_polygon": "각 점을 affine 으로 변환",
+      "rect": "polygon 으로 변환 후 각 점 변환",
+      "circle_iso": "ellipse 로 변환 — 2x2 행렬 M=[[a,c],[b,d]] 의 특이값분해로 rx/ry/rotation 산출",
+      "arc_iso": "arc 의 rx/ry/rotation 을 같은 방식으로 산출하고 start/endAngle 재매개화",
+      "circle_arc_screen": "중심점만 변환하고 반지름·각도는 유지",
+      "text": "앵커 점만 변환. rotation 은 0 (태그) 또는 치수선 정렬각"
+    },
+    "planeUpRule": {
+      "_comment": "v 선택 순서. 잘못 고르면 심볼이 '평면도를 붙여놓은 것'처럼 보인다.",
+      "1_spindle": "PCF 에 SPINDLE-DIRECTION 이 있으면 그 방향을 u 에 직교화해서 쓴다 — 밸브 스템의 실제 방향이 곧 심볼 평면이다",
+      "2_horizontalRun": "|u·Z| < 0.999 이면 v = normalize(Z - (Z·u)u) — 가장 수직에 가까운 직교축. 심볼 횡방향이 화면 수직이 된다",
+      "3_verticalRun": "수직 런이면 화면에서 위로 읽히는 수평축을 쓴다. 기본 -N (화면 우상향). 프로젝트 설정으로 교체 가능"
+    },
+    "textRule": "태그 문자는 plane=screen 으로 화면 수평 유지. 치수 문자만 치수선에 정렬시킨다(엔진이 rotation 부여)."
+  },
+  "engineInvoked": {
+    "_comment": "SKEY 로 오지 않고 레이아웃 엔진이 직접 배치하는 형상 — skey-table.json 에 항목이 없는 것이 정상",
+    "shapes": [
+      "NORTH_ARROW",
+      "CONTINUATION",
+      "BEND_RADIUS",
+      "HANDWHEEL_DIR",
+      "ARROW_DIMENSION",
+      "LINE_BREAK"
+    ]
+  },
+  "endTreatments": {
+    "_comment": "포트 위치에 그려지는 접합부 표기. dir = +1(오른쪽 포트) / -1(왼쪽 포트) 로 미러링",
+    "BW": {
+      "name": "맞대기 용접 (Butt Weld)",
+      "elements": [
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.13,
+          "role": "solid"
+        }
+      ]
+    },
+    "SW": {
+      "name": "소켓 용접 (Socket Weld)",
+      "elements": [
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.3,
+          "x2": 0,
+          "y2": 0.3,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.3,
+          "x2": -0.2,
+          "y2": 0.3,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.3,
+          "x2": -0.2,
+          "y2": -0.3,
+          "role": "outline"
+        }
+      ]
+    },
+    "SC": {
+      "name": "나사 접합 (Screwed)",
+      "elements": [
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.3,
+          "x2": 0,
+          "y2": 0.3,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.3,
+          "x2": -0.2,
+          "y2": 0.3,
+          "role": "outline"
+        }
+      ]
+    },
+    "FL": {
+      "name": "플랜지 접합 (Flanged)",
+      "elements": [
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.42,
+          "x2": 0,
+          "y2": 0.42,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.16,
+          "y1": -0.42,
+          "x2": -0.16,
+          "y2": 0.42,
+          "role": "outline"
+        }
+      ]
+    },
+    "PL": {
+      "name": "평단면 (Plain End)",
+      "elements": []
+    },
+    "CP": {
+      "name": "압축 접합 (Compression)",
+      "elements": [
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.18,
+              "y": -0.26
+            },
+            {
+              "x": 0,
+              "y": -0.26
+            },
+            {
+              "x": 0,
+              "y": 0.26
+            },
+            {
+              "x": -0.18,
+              "y": 0.26
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "GL": {
+      "name": "접착 접합 (Glued)",
+      "elements": [
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.28,
+          "x2": 0,
+          "y2": 0.28,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.22,
+          "y1": -0.28,
+          "x2": -0.22,
+          "y2": 0.28,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.22,
+          "y1": 0.28,
+          "x2": 0,
+          "y2": 0.28,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.22,
+          "y1": -0.28,
+          "x2": 0,
+          "y2": -0.28,
+          "role": "outline"
+        }
+      ]
+    },
+    "PF": {
+      "name": "밀어끼움 (Push Fit)",
+      "elements": [
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.28,
+          "x2": 0,
+          "y2": 0.28,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.24,
+              "y": -0.18
+            },
+            {
+              "x": 0,
+              "y": -0.28
+            },
+            {
+              "x": 0,
+              "y": 0.28
+            },
+            {
+              "x": -0.24,
+              "y": 0.18
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "FA": {
+      "name": "플레어 접합 (Flared)",
+      "elements": [
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.22,
+              "y": -0.14
+            },
+            {
+              "x": 0,
+              "y": -0.34
+            },
+            {
+              "x": 0,
+              "y": 0.34
+            },
+            {
+              "x": -0.22,
+              "y": 0.14
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "CL": {
+      "name": "클램프 접합 (Clamped)",
+      "elements": [
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.36,
+          "x2": 0,
+          "y2": 0.36,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.18,
+          "y1": -0.36,
+          "x2": -0.18,
+          "y2": 0.36,
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": -0.09,
+          "cy": 0,
+          "r": 0.36,
+          "startAngle": -1.047198,
+          "endAngle": 1.047198,
+          "role": "outline"
+        }
+      ]
+    },
+    "BS": {
+      "name": "볼&소켓 플랜지 (Ball / Socket)",
+      "elements": [
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.4,
+          "x2": 0,
+          "y2": 0.4,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": -0.2,
+          "cy": 0,
+          "r": 0.16,
+          "role": "outline"
+        }
+      ]
+    },
+    "MP": {
+      "name": "수형 접속부 (Male Part)",
+      "elements": [
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.24,
+              "y": -0.22
+            },
+            {
+              "x": 0,
+              "y": -0.3
+            },
+            {
+              "x": 0,
+              "y": 0.3
+            },
+            {
+              "x": -0.24,
+              "y": 0.22
+            }
+          ],
+          "role": "solid"
+        }
+      ]
+    },
+    "LN": {
+      "name": "라이너/너트 (Liner / Nut)",
+      "elements": [
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.26,
+              "y": -0.3
+            },
+            {
+              "x": 0,
+              "y": -0.3
+            },
+            {
+              "x": 0,
+              "y": 0.3
+            },
+            {
+              "x": -0.26,
+              "y": 0.3
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.13,
+          "y1": -0.3,
+          "x2": -0.13,
+          "y2": 0.3,
+          "role": "outline"
+        }
+      ]
+    },
+    "LC": {
+      "name": "라이너/클램프 (Liner / Clamp)",
+      "elements": [
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.26,
+              "y": -0.3
+            },
+            {
+              "x": 0,
+              "y": -0.3
+            },
+            {
+              "x": 0,
+              "y": 0.3
+            },
+            {
+              "x": -0.26,
+              "y": 0.3
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": -0.13,
+          "cy": 0,
+          "r": 0.38,
+          "startAngle": -0.959931,
+          "endAngle": 0.959931,
+          "role": "outline"
+        }
+      ]
+    },
+    "LR": {
+      "name": "리듀싱 라이너/너트 (Reducing Liner / Nut)",
+      "elements": [
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.26,
+              "y": -0.3
+            },
+            {
+              "x": 0,
+              "y": -0.18
+            },
+            {
+              "x": 0,
+              "y": 0.18
+            },
+            {
+              "x": -0.26,
+              "y": 0.3
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.13,
+          "y1": -0.24,
+          "x2": -0.13,
+          "y2": 0.24,
+          "role": "outline"
+        }
+      ]
+    }
+  },
+  "shapes": {
+    "_comment": "인라인 컴포넌트 형상. 별도 언급이 없으면 포트는 (-1,0)/(+1,0), 심볼 본체는 X ∈ [-0.6, 0.6]",
+    "FLANGE_WN": {
+      "name": "웰드넥 플랜지",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": -0.55,
+          "cy": 0,
+          "r": 0.13,
+          "role": "solid"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.42,
+              "y": -0.12
+            },
+            {
+              "x": 0,
+              "y": -0.46
+            },
+            {
+              "x": 0,
+              "y": 0.46
+            },
+            {
+              "x": -0.42,
+              "y": 0.12
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.5,
+          "x2": 0,
+          "y2": 0.5,
+          "role": "outline"
+        }
+      ]
+    },
+    "FLANGE_SW": {
+      "name": "소켓웰드 플랜지",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.38,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.38,
+          "y1": -0.3,
+          "x2": -0.38,
+          "y2": 0.3,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.38,
+          "y1": 0.3,
+          "x2": -0.18,
+          "y2": 0.3,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.38,
+          "y1": -0.3,
+          "x2": -0.18,
+          "y2": -0.3,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.5,
+          "x2": 0,
+          "y2": 0.5,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.18,
+          "y1": -0.3,
+          "x2": -0.18,
+          "y2": 0.3,
+          "role": "outline"
+        }
+      ]
+    },
+    "FLANGE_SC": {
+      "name": "나사 플랜지",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.4,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.4,
+              "y": -0.2
+            },
+            {
+              "x": -0.18,
+              "y": -0.2
+            },
+            {
+              "x": -0.18,
+              "y": 0.2
+            },
+            {
+              "x": -0.4,
+              "y": 0.2
+            }
+          ],
+          "role": "solid"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.5,
+          "x2": 0,
+          "y2": 0.5,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.18,
+          "y1": 0,
+          "x2": 0,
+          "y2": 0,
+          "role": "outline"
+        }
+      ]
+    },
+    "FLANGE_SO": {
+      "name": "슬립온 플랜지",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.5,
+          "x2": 0,
+          "y2": 0.5,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.16,
+          "y1": -0.26,
+          "x2": -0.16,
+          "y2": 0.26,
+          "role": "outline"
+        }
+      ]
+    },
+    "FLANGE_LJ": {
+      "name": "랩조인트 플랜지 (스터브엔드 + 백킹링)",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.45,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": -0.45,
+          "cy": 0,
+          "r": 0.13,
+          "role": "solid"
+        },
+        {
+          "type": "line",
+          "x1": -0.45,
+          "y1": 0,
+          "x2": 0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.5,
+          "x2": 0,
+          "y2": 0.5,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.18,
+          "y1": -0.38,
+          "x2": -0.18,
+          "y2": 0.38,
+          "role": "outline"
+        }
+      ]
+    },
+    "FLANGE_BL": {
+      "name": "블라인드 플랜지",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -0.55,
+          "y1": 0,
+          "x2": 0,
+          "y2": 0,
+          "role": "hidden"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.5,
+          "x2": 0,
+          "y2": 0.5,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.16,
+          "y1": -0.5,
+          "x2": -0.16,
+          "y2": 0.5,
+          "role": "outline"
+        }
+      ]
+    },
+    "FLANGE_RC": {
+      "name": "동심 리듀싱 플랜지",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.2
+            },
+            {
+              "x": 0,
+              "y": -0.46
+            },
+            {
+              "x": 0,
+              "y": 0.46
+            },
+            {
+              "x": -0.55,
+              "y": 0.2
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.5,
+          "x2": 0,
+          "y2": 0.5,
+          "role": "outline"
+        }
+      ]
+    },
+    "FLANGE_RE": {
+      "name": "편심 리듀싱 플랜지",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.2
+            },
+            {
+              "x": 0,
+              "y": -0.2
+            },
+            {
+              "x": 0,
+              "y": 0.5
+            },
+            {
+              "x": -0.55,
+              "y": 0.24
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.24,
+          "x2": 0,
+          "y2": 0.54,
+          "role": "outline"
+        }
+      ]
+    },
+    "FLANGE_ORIFICE": {
+      "name": "오리피스 플랜지 (탭 포함)",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.5,
+          "x2": 0,
+          "y2": 0.5,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.18,
+          "y1": -0.5,
+          "x2": -0.18,
+          "y2": 0.5,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.09,
+          "y1": 0.5,
+          "x2": -0.09,
+          "y2": 0.8,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.09,
+          "y1": -0.5,
+          "x2": -0.09,
+          "y2": -0.8,
+          "role": "outline"
+        }
+      ]
+    },
+    "VALVE_GATE": {
+      "name": "게이트 밸브",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.42
+            },
+            {
+              "x": -0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0.55,
+              "y": -0.42
+            },
+            {
+              "x": 0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "VALVE_GLOBE": {
+      "name": "글로브 밸브",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.42
+            },
+            {
+              "x": -0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0.55,
+              "y": -0.42
+            },
+            {
+              "x": 0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.19,
+          "role": "solid"
+        }
+      ]
+    },
+    "VALVE_BALL": {
+      "name": "볼 밸브",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.42
+            },
+            {
+              "x": -0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0.55,
+              "y": -0.42
+            },
+            {
+              "x": 0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.27,
+          "role": "outline"
+        }
+      ]
+    },
+    "VALVE_PLUG": {
+      "name": "플러그 밸브",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.42
+            },
+            {
+              "x": -0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0.55,
+              "y": -0.42
+            },
+            {
+              "x": 0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.13,
+              "y": -0.24
+            },
+            {
+              "x": 0.13,
+              "y": -0.24
+            },
+            {
+              "x": 0.13,
+              "y": 0.24
+            },
+            {
+              "x": -0.13,
+              "y": 0.24
+            }
+          ],
+          "role": "solid"
+        }
+      ]
+    },
+    "VALVE_COCK": {
+      "name": "콕 밸브",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.42
+            },
+            {
+              "x": -0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0.55,
+              "y": -0.42
+            },
+            {
+              "x": 0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.42,
+          "x2": 0,
+          "y2": 0.42,
+          "role": "outline"
+        }
+      ]
+    },
+    "VALVE_BUTTERFLY": {
+      "name": "버터플라이 밸브",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.45,
+          "y1": -0.42,
+          "x2": -0.45,
+          "y2": 0.42,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.45,
+          "y1": -0.42,
+          "x2": 0.45,
+          "y2": 0.42,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.3,
+          "y1": 0.34,
+          "x2": 0.3,
+          "y2": -0.34,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.15,
+          "role": "solid"
+        }
+      ]
+    },
+    "VALVE_NEEDLE": {
+      "name": "니들 밸브",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.42
+            },
+            {
+              "x": -0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0.55,
+              "y": -0.42
+            },
+            {
+              "x": 0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.17,
+              "y": 0.42
+            },
+            {
+              "x": 0.17,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0.02
+            }
+          ],
+          "role": "solid"
+        }
+      ]
+    },
+    "VALVE_DIAPHRAGM": {
+      "name": "다이어프램 밸브",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.42
+            },
+            {
+              "x": -0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0.55,
+              "y": -0.42
+            },
+            {
+              "x": 0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": 0,
+          "cy": -0.1,
+          "r": 0.55,
+          "startAngle": 0.436332,
+          "endAngle": 2.70526,
+          "role": "outline"
+        }
+      ]
+    },
+    "VALVE_SLIDE": {
+      "name": "슬라이드 밸브",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.42
+            },
+            {
+              "x": -0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0.55,
+              "y": -0.42
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.42,
+          "x2": 0,
+          "y2": 0.62,
+          "role": "outline"
+        }
+      ]
+    },
+    "VALVE_CHECK": {
+      "name": "체크 밸브 (유동 방향 의존)",
+      "ports": 2,
+      "flowDependent": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.5,
+              "y": -0.4
+            },
+            {
+              "x": -0.5,
+              "y": 0.4
+            },
+            {
+              "x": 0.45,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.45,
+          "y1": -0.42,
+          "x2": 0.45,
+          "y2": 0.42,
+          "role": "outline"
+        }
+      ]
+    },
+    "VALVE_YTYPE": {
+      "name": "Y형 밸브",
+      "ports": 2,
+      "userDefinable": true,
+      "_note": "ISOGEN 표준 SKEY 가 없다. 프로젝트 표준에서 사용자 SKEY 를 배정해 skey-table.json 에 추가할 것",
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.3
+            },
+            {
+              "x": -0.55,
+              "y": 0.54
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0.55,
+              "y": -0.54
+            },
+            {
+              "x": 0.55,
+              "y": 0.3
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "VALVE_ANGLE": {
+      "name": "앵글 밸브 (입구 축 → 출구 직각)",
+      "ports": 2,
+      "portDirs": [
+        [
+          -1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.55,
+          "x2": 0,
+          "y2": 1.0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.42
+            },
+            {
+              "x": -0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.42,
+              "y": 0.55
+            },
+            {
+              "x": 0.42,
+              "y": 0.55
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "VALVE_RELIEF": {
+      "name": "릴리프 / 벤트 밸브",
+      "ports": 2,
+      "portDirs": [
+        [
+          -1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.42
+            },
+            {
+              "x": -0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.42,
+              "y": 0.55
+            },
+            {
+              "x": 0.42,
+              "y": 0.55
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.55,
+          "x2": 0,
+          "y2": 1.0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.3,
+          "y1": 0.72,
+          "x2": 0.3,
+          "y2": 0.9,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.3,
+          "y1": 0.85,
+          "x2": 0.3,
+          "y2": 1.03,
+          "role": "outline"
+        }
+      ]
+    },
+    "VALVE_3WAY": {
+      "name": "3방 밸브",
+      "ports": 3,
+      "portDirs": [
+        [
+          -1,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.42,
+          "x2": 0,
+          "y2": 1.0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.42
+            },
+            {
+              "x": -0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0.55,
+              "y": -0.42
+            },
+            {
+              "x": 0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.42,
+              "y": 0.42
+            },
+            {
+              "x": 0.42,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "VALVE_4WAY": {
+      "name": "4방 밸브",
+      "ports": 4,
+      "portDirs": [
+        [
+          -1,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          -1
+        ]
+      ],
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.42,
+          "x2": 0,
+          "y2": 1.0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.42,
+          "x2": 0,
+          "y2": -1.0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.42
+            },
+            {
+              "x": -0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0.55,
+              "y": -0.42
+            },
+            {
+              "x": 0.55,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.42,
+              "y": 0.42
+            },
+            {
+              "x": 0.42,
+              "y": 0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.42,
+              "y": -0.42
+            },
+            {
+              "x": 0.42,
+              "y": -0.42
+            },
+            {
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "ACTUATOR_CONTROL": {
+      "name": "제어 액추에이터 (다이어프램)",
+      "overlay": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.42,
+          "x2": 0,
+          "y2": 0.8,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 1.02,
+          "r": 0.24,
+          "role": "outline"
+        }
+      ]
+    },
+    "ACTUATOR_HAND": {
+      "name": "수동 핸들 액추에이터",
+      "overlay": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.42,
+          "x2": 0,
+          "y2": 0.9,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.3,
+          "y1": 0.9,
+          "x2": 0.3,
+          "y2": 0.9,
+          "role": "outline"
+        }
+      ]
+    },
+    "ACTUATOR_MOTOR": {
+      "name": "모터 액추에이터",
+      "overlay": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.42,
+          "x2": 0,
+          "y2": 0.78,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 1.0,
+          "r": 0.24,
+          "role": "outline"
+        },
+        {
+          "type": "text",
+          "x": 0,
+          "y": 1.0,
+          "content": "M",
+          "height": 0.3,
+          "anchor": "middle",
+          "role": "text",
+          "plane": "screen"
+        }
+      ]
+    },
+    "ACTUATOR_SQUARE": {
+      "name": "사각 인디케이터 액추에이터",
+      "overlay": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.42,
+          "x2": 0,
+          "y2": 0.78,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.24,
+              "y": 0.78
+            },
+            {
+              "x": 0.24,
+              "y": 0.78
+            },
+            {
+              "x": 0.24,
+              "y": 1.26
+            },
+            {
+              "x": -0.24,
+              "y": 1.26
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "REDUCER_CONC": {
+      "name": "동심 리듀서",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.44
+            },
+            {
+              "x": 0.55,
+              "y": -0.2
+            },
+            {
+              "x": 0.55,
+              "y": 0.2
+            },
+            {
+              "x": -0.55,
+              "y": 0.44
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "REDUCER_ECC": {
+      "name": "편심 리듀서 (한쪽 면 평행)",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": -0.24,
+          "x2": 1.0,
+          "y2": -0.24,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.55,
+              "y": -0.44
+            },
+            {
+              "x": 0.55,
+              "y": -0.44
+            },
+            {
+              "x": 0.55,
+              "y": -0.04
+            },
+            {
+              "x": -0.55,
+              "y": 0.44
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "CAP": {
+      "name": "캡",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.3,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.3,
+          "y1": -0.42,
+          "x2": -0.3,
+          "y2": 0.42,
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": -0.3,
+          "cy": 0,
+          "r": 0.42,
+          "startAngle": -1.570796,
+          "endAngle": 1.570796,
+          "role": "outline"
+        }
+      ]
+    },
+    "UNION": {
+      "name": "유니온",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.22,
+          "y1": -0.42,
+          "x2": -0.22,
+          "y2": 0.42,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.22,
+          "y1": -0.42,
+          "x2": 0.22,
+          "y2": 0.42,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.5,
+          "x2": 0,
+          "y2": 0.5,
+          "role": "outline"
+        }
+      ]
+    },
+    "COUPLING": {
+      "name": "커플링",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.34,
+              "y": -0.3
+            },
+            {
+              "x": 0.34,
+              "y": -0.3
+            },
+            {
+              "x": 0.34,
+              "y": 0.3
+            },
+            {
+              "x": -0.34,
+              "y": 0.3
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "SPACER": {
+      "name": "스페이서",
+      "ports": 1,
+      "userDefinable": true,
+      "_note": "ISOGEN 표준 SKEY 가 없다. 프로젝트 표준에서 사용자 SKEY 를 배정할 것",
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.26,
+          "y1": -0.46,
+          "x2": -0.26,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.26,
+          "y1": -0.46,
+          "x2": 0.26,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.12,
+              "y": -0.3
+            },
+            {
+              "x": 0.12,
+              "y": -0.3
+            },
+            {
+              "x": 0.12,
+              "y": 0.3
+            },
+            {
+              "x": -0.12,
+              "y": 0.3
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "SPADE": {
+      "name": "스페이드 (삽입판)",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.16,
+          "y1": -0.46,
+          "x2": -0.16,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.16,
+          "y1": -0.46,
+          "x2": 0.16,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.46,
+          "x2": 0,
+          "y2": 0.92,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0.98,
+          "r": 0.16,
+          "role": "solid"
+        },
+        {
+          "type": "text",
+          "x": 0.3,
+          "y": 0.98,
+          "content": "SP",
+          "height": 0.34,
+          "anchor": "start",
+          "role": "text",
+          "plane": "screen"
+        }
+      ]
+    },
+    "SPECTACLE_BLIND": {
+      "name": "스펙터클 블라인드 (8자 블라인드)",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.16,
+          "y1": -0.46,
+          "x2": -0.16,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.16,
+          "y1": -0.46,
+          "x2": 0.16,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.46,
+          "x2": 0,
+          "y2": 0.86,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0.86,
+          "r": 0.15,
+          "role": "solid"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 1.16,
+          "r": 0.15,
+          "role": "outline"
+        },
+        {
+          "type": "text",
+          "x": 0.32,
+          "y": 1.0,
+          "content": "SB",
+          "height": 0.34,
+          "anchor": "start",
+          "role": "text",
+          "plane": "screen"
+        }
+      ]
+    },
+    "HAMMER_BLIND": {
+      "name": "해머 블라인드",
+      "ports": 1,
+      "userDefinable": true,
+      "_note": "ISOGEN 표준 SKEY 없음 — 프로젝트 표준에서 배정",
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.16,
+          "y1": -0.46,
+          "x2": -0.16,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.16,
+          "y1": -0.46,
+          "x2": 0.16,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.46,
+          "x2": 0,
+          "y2": 0.92,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0.98,
+          "r": 0.16,
+          "role": "solid"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": -0.72,
+          "r": 0.14,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.46,
+          "x2": 0,
+          "y2": -0.58,
+          "role": "outline"
+        },
+        {
+          "type": "text",
+          "x": 0.32,
+          "y": 0.98,
+          "content": "HB",
+          "height": 0.34,
+          "anchor": "start",
+          "role": "text",
+          "plane": "screen"
+        }
+      ]
+    },
+    "RESTRICTION_ORIFICE": {
+      "name": "제한 오리피스 (RO)",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.16,
+          "y1": -0.46,
+          "x2": -0.16,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.16,
+          "y1": -0.46,
+          "x2": 0.16,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.46,
+          "x2": 0,
+          "y2": 0.72,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 1.06,
+          "r": 0.34,
+          "role": "outline"
+        },
+        {
+          "type": "text",
+          "x": 0,
+          "y": 1.06,
+          "content": "RO",
+          "height": 0.32,
+          "anchor": "middle",
+          "role": "text",
+          "plane": "screen"
+        }
+      ]
+    },
+    "ORIFICE_PLATE": {
+      "name": "오리피스 플레이트",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.52,
+          "x2": 0,
+          "y2": 0.52,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.3,
+          "y1": 0.52,
+          "x2": -0.3,
+          "y2": 0.86,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.3,
+          "y1": 0.52,
+          "x2": 0.3,
+          "y2": 0.86,
+          "role": "outline"
+        }
+      ]
+    },
+    "RUPTURE_DISK": {
+      "name": "파열판 (Rupture Disk)",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.2,
+          "y1": -0.46,
+          "x2": -0.2,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.2,
+          "y1": -0.46,
+          "x2": 0.2,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": -0.2,
+          "cy": 0,
+          "r": 0.4,
+          "startAngle": -1.308997,
+          "endAngle": 1.308997,
+          "role": "outline"
+        }
+      ]
+    },
+    "SIGHT_GLASS": {
+      "name": "사이트 글라스",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.2,
+          "y1": 0,
+          "x2": 1.2,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.78,
+          "y1": -0.4,
+          "x2": -0.78,
+          "y2": 0.4,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.62,
+          "y1": -0.4,
+          "x2": -0.62,
+          "y2": 0.4,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.62,
+          "y1": -0.4,
+          "x2": 0.62,
+          "y2": 0.4,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.78,
+          "y1": -0.4,
+          "x2": 0.78,
+          "y2": 0.4,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.4,
+              "y": -0.34
+            },
+            {
+              "x": 0.4,
+              "y": -0.34
+            },
+            {
+              "x": 0.4,
+              "y": 0.34
+            },
+            {
+              "x": -0.4,
+              "y": 0.34
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "text",
+          "x": 0,
+          "y": 0,
+          "content": "SGI",
+          "height": 0.32,
+          "anchor": "middle",
+          "role": "text",
+          "plane": "screen"
+        }
+      ]
+    },
+    "STRAINER_Y": {
+      "name": "Y형 스트레이너",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": -0.45,
+          "cy": 0,
+          "r": 0.13,
+          "role": "solid"
+        },
+        {
+          "type": "circle",
+          "cx": 0.45,
+          "cy": 0,
+          "r": 0.13,
+          "role": "solid"
+        },
+        {
+          "type": "line",
+          "x1": 0.1,
+          "y1": 0,
+          "x2": -0.42,
+          "y2": -0.72,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.46,
+          "y1": -0.5,
+          "x2": -0.16,
+          "y2": -0.66,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.36,
+          "y1": -0.64,
+          "x2": -0.06,
+          "y2": -0.8,
+          "role": "outline"
+        }
+      ]
+    },
+    "STRAINER_CONE": {
+      "name": "원추형 스트레이너",
+      "ports": 1,
+      "userDefinable": true,
+      "_note": "ISOGEN 표준 SKEY 없음 — FA** 는 플랜지 내장형(STRAINER_CONE_INLINE)에 배정됨",
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0.34,
+              "y": -0.34
+            },
+            {
+              "x": 0.34,
+              "y": 0.34
+            },
+            {
+              "x": -0.34,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "STRAINER_CONE_INLINE": {
+      "name": "원추형 스트레이너 (플랜지 내장)",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0.2,
+              "y": -0.34
+            },
+            {
+              "x": 0.2,
+              "y": 0.34
+            },
+            {
+              "x": -0.48,
+              "y": 0
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.34,
+          "y1": -0.46,
+          "x2": 0.34,
+          "y2": 0.46,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.52,
+          "y1": -0.46,
+          "x2": 0.52,
+          "y2": 0.46,
+          "role": "outline"
+        }
+      ]
+    },
+    "FILTER_INLINE": {
+      "name": "인라인 필터 / 스트레이너",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.44,
+              "y": -0.4
+            },
+            {
+              "x": 0.44,
+              "y": -0.4
+            },
+            {
+              "x": 0.44,
+              "y": 0.4
+            },
+            {
+              "x": -0.44,
+              "y": 0.4
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.44,
+          "y1": 0.4,
+          "x2": 0.44,
+          "y2": -0.4,
+          "role": "outline"
+        }
+      ]
+    },
+    "TRAP": {
+      "name": "스팀 트랩",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.42,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.42,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.42,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.3,
+          "y1": -0.3,
+          "x2": 0.3,
+          "y2": 0.3,
+          "role": "outline"
+        }
+      ]
+    },
+    "EXPANSION_BELLOWS": {
+      "name": "신축 이음 (벨로우즈)",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.5,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.5,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.5,
+          "y1": -0.42,
+          "x2": -0.5,
+          "y2": 0.42,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.5,
+          "y1": -0.42,
+          "x2": 0.5,
+          "y2": 0.42,
+          "role": "outline"
+        },
+        {
+          "type": "polyline",
+          "points": [
+            {
+              "x": -0.5,
+              "y": 0.3
+            },
+            {
+              "x": -0.25,
+              "y": -0.3
+            },
+            {
+              "x": 0,
+              "y": 0.3
+            },
+            {
+              "x": 0.25,
+              "y": -0.3
+            },
+            {
+              "x": 0.5,
+              "y": 0.3
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "FLEXIBLE_HOSE": {
+      "name": "플렉시블 호스",
+      "ports": 2,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.55,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.55,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": -0.36,
+          "cy": 0,
+          "r": 0.19,
+          "startAngle": 3.141593,
+          "endAngle": 0.0,
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.19,
+          "startAngle": 3.141593,
+          "endAngle": 0.0,
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": 0.36,
+          "cy": 0,
+          "r": 0.19,
+          "startAngle": 3.141593,
+          "endAngle": 0.0,
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": -0.18,
+          "cy": 0,
+          "r": 0.19,
+          "startAngle": 0.0,
+          "endAngle": -3.141593,
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": 0.18,
+          "cy": 0,
+          "r": 0.19,
+          "startAngle": 0.0,
+          "endAngle": -3.141593,
+          "role": "outline"
+        }
+      ]
+    },
+    "PLUG": {
+      "name": "플러그",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.2,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.2,
+          "y1": -0.34,
+          "x2": -0.2,
+          "y2": 0.34,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.2,
+              "y": -0.26
+            },
+            {
+              "x": 0.26,
+              "y": -0.16
+            },
+            {
+              "x": 0.26,
+              "y": 0.16
+            },
+            {
+              "x": -0.2,
+              "y": 0.26
+            }
+          ],
+          "role": "solid"
+        }
+      ]
+    },
+    "TUNDISH": {
+      "name": "턴디시 (깔때기)",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": -0.3,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polyline",
+          "points": [
+            {
+              "x": -0.3,
+              "y": -0.2
+            },
+            {
+              "x": 0.5,
+              "y": -0.62
+            },
+            {
+              "x": 0.5,
+              "y": 0.62
+            },
+            {
+              "x": -0.3,
+              "y": 0.2
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "INSTRUMENT_DIAL": {
+      "name": "계기 (다이얼)",
+      "ports": 1,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0,
+          "x2": 0,
+          "y2": 0.6,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0.98,
+          "r": 0.38,
+          "role": "outline"
+        }
+      ]
+    },
+    "OLET_WELDOLET": {
+      "name": "웰돌렛 (분기 대좌)",
+      "branch": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.3,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": 0.34
+            },
+            {
+              "x": 0.3,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": -0.1
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.34,
+          "x2": 0,
+          "y2": 0.86,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0.92,
+          "r": 0.14,
+          "role": "solid"
+        }
+      ]
+    },
+    "OLET_NIPOLET": {
+      "name": "니폴렛",
+      "branch": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.3,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": 0.34
+            },
+            {
+              "x": 0.3,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": -0.1
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.34,
+          "x2": 0,
+          "y2": 0.74,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.14,
+          "y1": 0.74,
+          "x2": 0.14,
+          "y2": 0.74,
+          "role": "outline"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0.92,
+          "r": 0.13,
+          "role": "solid"
+        }
+      ]
+    },
+    "OLET_FLANGOLET": {
+      "name": "플랜졸렛",
+      "branch": true,
+      "userDefinable": true,
+      "_note": "ISOGEN 표준 SKEY 없음 — 프로젝트 표준에서 배정",
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.3,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": 0.34
+            },
+            {
+              "x": 0.3,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": -0.1
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.34,
+          "x2": 0,
+          "y2": 0.92,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.34,
+          "y1": 0.92,
+          "x2": 0.34,
+          "y2": 0.92,
+          "role": "outline"
+        }
+      ]
+    },
+    "OLET_SOCKOLET": {
+      "name": "소콜렛 / 스레돌렛",
+      "branch": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.3,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": 0.34
+            },
+            {
+              "x": 0.3,
+              "y": 0
+            },
+            {
+              "x": 0,
+              "y": -0.1
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.34,
+          "x2": 0,
+          "y2": 0.86,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.2,
+          "y1": 0.7,
+          "x2": 0.2,
+          "y2": 0.7,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.2,
+          "y1": 0.86,
+          "x2": 0.2,
+          "y2": 0.86,
+          "role": "outline"
+        }
+      ]
+    },
+    "REINFORCING_PAD": {
+      "name": "보강판 (Reinforcing Pad)",
+      "branch": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.42,
+          "y1": 0.12,
+          "x2": 0.42,
+          "y2": 0.12,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.42,
+          "y1": 0.12,
+          "x2": -0.3,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.42,
+          "y1": 0.12,
+          "x2": 0.3,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0.12,
+          "x2": 0,
+          "y2": 0.8,
+          "role": "outline"
+        }
+      ]
+    },
+    "SUPPORT_ANCHOR": {
+      "name": "앵커 서포트",
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0,
+          "x2": 0,
+          "y2": -0.7,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.42,
+          "y1": -0.7,
+          "x2": 0.42,
+          "y2": -0.7,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.42,
+          "y1": -0.7,
+          "x2": -0.28,
+          "y2": -0.92,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.14,
+          "y1": -0.7,
+          "x2": 0,
+          "y2": -0.92,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.14,
+          "y1": -0.7,
+          "x2": 0.28,
+          "y2": -0.92,
+          "role": "outline"
+        }
+      ]
+    },
+    "SUPPORT_GUIDE": {
+      "name": "가이드 서포트",
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.34,
+          "y1": -0.34,
+          "x2": -0.34,
+          "y2": 0.34,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.34,
+          "y1": -0.34,
+          "x2": 0.34,
+          "y2": 0.34,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.34,
+          "y1": -0.34,
+          "x2": 0.34,
+          "y2": -0.34,
+          "role": "outline"
+        }
+      ]
+    },
+    "SUPPORT_HANGER": {
+      "name": "행거 서포트",
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0,
+          "x2": 0,
+          "y2": 0.8,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.42,
+          "y1": 0.8,
+          "x2": 0.42,
+          "y2": 0.8,
+          "role": "outline"
+        }
+      ]
+    },
+    "SUPPORT_SPRING": {
+      "name": "스프링 행거",
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": 0,
+          "x2": 0,
+          "y2": 0.36,
+          "role": "outline"
+        },
+        {
+          "type": "polyline",
+          "points": [
+            {
+              "x": 0,
+              "y": 0.36
+            },
+            {
+              "x": 0.26,
+              "y": 0.48
+            },
+            {
+              "x": -0.26,
+              "y": 0.62
+            },
+            {
+              "x": 0.26,
+              "y": 0.76
+            },
+            {
+              "x": -0.26,
+              "y": 0.9
+            },
+            {
+              "x": 0,
+              "y": 1.02
+            }
+          ],
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.42,
+          "y1": 1.02,
+          "x2": 0.42,
+          "y2": 1.02,
+          "role": "outline"
+        }
+      ]
+    },
+    "SUPPORT_SKID": {
+      "name": "스키드 / 슈 서포트",
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.48,
+              "y": -0.2
+            },
+            {
+              "x": 0.48,
+              "y": -0.2
+            },
+            {
+              "x": 0.48,
+              "y": -0.48
+            },
+            {
+              "x": -0.48,
+              "y": -0.48
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    },
+    "WELD_SHOP": {
+      "name": "공장 용접 (Workshop Weld)",
+      "mark": true,
+      "elements": [
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.15,
+          "role": "solid",
+          "plane": "screen"
+        }
+      ]
+    },
+    "WELD_SHOP_DOTTED": {
+      "name": "공장 용접 (점선 표기)",
+      "mark": true,
+      "elements": [
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.15,
+          "role": "outline",
+          "plane": "screen"
+        }
+      ]
+    },
+    "WELD_FIELD": {
+      "name": "현장 맞춤 용접 (Field Fit)",
+      "mark": true,
+      "elements": [
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.15,
+          "role": "solid",
+          "plane": "screen"
+        },
+        {
+          "type": "line",
+          "x1": -0.34,
+          "y1": -0.34,
+          "x2": 0.34,
+          "y2": 0.34,
+          "role": "outline",
+          "plane": "screen"
+        },
+        {
+          "type": "line",
+          "x1": -0.34,
+          "y1": 0.34,
+          "x2": 0.34,
+          "y2": -0.34,
+          "role": "outline",
+          "plane": "screen"
+        },
+        {
+          "type": "text",
+          "x": 0.46,
+          "y": 0.34,
+          "content": "FW",
+          "height": 0.34,
+          "anchor": "start",
+          "role": "text",
+          "plane": "screen"
+        }
+      ]
+    },
+    "WELD_SITE": {
+      "name": "현장 용접 (Site Weld)",
+      "mark": true,
+      "elements": [
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.15,
+          "role": "solid",
+          "plane": "screen"
+        },
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.32,
+          "role": "outline",
+          "plane": "screen"
+        }
+      ]
+    },
+    "WELD_MITRE": {
+      "name": "마이터 용접",
+      "mark": true,
+      "elements": [
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.15,
+          "role": "solid",
+          "plane": "screen"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.36,
+          "x2": 0,
+          "y2": 0.36,
+          "role": "outline",
+          "plane": "screen"
+        }
+      ]
+    },
+    "WELD_TACK": {
+      "name": "가용접 (Tack)",
+      "mark": true,
+      "elements": [
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.15,
+          "role": "outline",
+          "plane": "screen"
+        },
+        {
+          "type": "line",
+          "x1": -0.3,
+          "y1": 0,
+          "x2": 0.3,
+          "y2": 0,
+          "role": "outline",
+          "plane": "screen"
+        }
+      ]
+    },
+    "WELD_SOCKET_SITE": {
+      "name": "현장 소켓/나사/압축 접합",
+      "mark": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -0.28,
+          "y1": -0.28,
+          "x2": 0.28,
+          "y2": 0.28,
+          "role": "outline",
+          "plane": "screen"
+        },
+        {
+          "type": "line",
+          "x1": -0.28,
+          "y1": 0.28,
+          "x2": 0.28,
+          "y2": -0.28,
+          "role": "outline",
+          "plane": "screen"
+        }
+      ]
+    },
+    "FLOW_ARROW": {
+      "name": "유동 방향 화살표",
+      "mark": true,
+      "elements": [
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.4,
+              "y": -0.26
+            },
+            {
+              "x": 0.44,
+              "y": 0
+            },
+            {
+              "x": -0.4,
+              "y": 0.26
+            }
+          ],
+          "role": "solid"
+        }
+      ]
+    },
+    "ARROW_DIMENSION": {
+      "name": "치수선 화살표",
+      "mark": true,
+      "elements": [
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.44,
+              "y": -0.14
+            },
+            {
+              "x": 0.1,
+              "y": 0
+            },
+            {
+              "x": -0.44,
+              "y": 0.14
+            }
+          ],
+          "role": "solid"
+        }
+      ]
+    },
+    "LINE_BREAK": {
+      "name": "선 끊음 표기",
+      "mark": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -0.2,
+          "y1": -0.42,
+          "x2": 0.1,
+          "y2": 0.42,
+          "role": "outline",
+          "plane": "screen"
+        },
+        {
+          "type": "line",
+          "x1": 0.1,
+          "y1": -0.42,
+          "x2": 0.4,
+          "y2": 0.42,
+          "role": "outline",
+          "plane": "screen"
+        }
+      ]
+    },
+    "NORTH_ARROW": {
+      "name": "노스 애로우",
+      "mark": true,
+      "elements": [
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": 0,
+              "y": 1.2
+            },
+            {
+              "x": -0.4,
+              "y": -0.6
+            },
+            {
+              "x": 0,
+              "y": -0.2
+            },
+            {
+              "x": 0.4,
+              "y": -0.6
+            }
+          ],
+          "role": "solid",
+          "plane": "screen"
+        },
+        {
+          "type": "text",
+          "x": 0,
+          "y": -1.05,
+          "content": "N",
+          "height": 0.5,
+          "anchor": "middle",
+          "role": "text",
+          "plane": "screen"
+        }
+      ]
+    },
+    "INSULATION": {
+      "name": "보온 표기",
+      "mark": true,
+      "elements": [
+        {
+          "type": "arc",
+          "cx": -0.3,
+          "cy": 0,
+          "r": 0.22,
+          "startAngle": 3.141593,
+          "endAngle": 0.0,
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": 0.1,
+          "cy": 0,
+          "r": 0.22,
+          "startAngle": 3.141593,
+          "endAngle": 0.0,
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": -0.1,
+          "cy": 0,
+          "r": 0.22,
+          "startAngle": 0.0,
+          "endAngle": -3.141593,
+          "role": "outline"
+        },
+        {
+          "type": "arc",
+          "cx": 0.3,
+          "cy": 0,
+          "r": 0.22,
+          "startAngle": 0.0,
+          "endAngle": -3.141593,
+          "role": "outline"
+        }
+      ]
+    },
+    "BEND_RADIUS": {
+      "name": "특수 반경 밴드 표기",
+      "mark": true,
+      "elements": [
+        {
+          "type": "arc",
+          "cx": 0,
+          "cy": -0.6,
+          "r": 0.86,
+          "startAngle": 0.785398,
+          "endAngle": 1.570796,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.6,
+          "y1": 0.6,
+          "x2": 0.1,
+          "y2": 0.6,
+          "role": "outline"
+        },
+        {
+          "type": "text",
+          "x": -0.66,
+          "y": 0.6,
+          "content": "R=",
+          "height": 0.36,
+          "anchor": "end",
+          "role": "text",
+          "plane": "screen"
+        }
+      ]
+    },
+    "HANDWHEEL_DIR": {
+      "name": "핸드휠 / 렌치 방향 표기",
+      "mark": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": -0.3,
+          "x2": 1.0,
+          "y2": -0.3,
+          "role": "hidden"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.3,
+          "x2": 0,
+          "y2": 0.7,
+          "role": "outline"
+        },
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.16,
+              "y": 0.6
+            },
+            {
+              "x": 0,
+              "y": 1.0
+            },
+            {
+              "x": 0.16,
+              "y": 0.6
+            }
+          ],
+          "role": "solid"
+        }
+      ]
+    },
+    "LOCATION_POINT": {
+      "name": "위치 기준점",
+      "mark": true,
+      "elements": [
+        {
+          "type": "circle",
+          "cx": 0,
+          "cy": 0,
+          "r": 0.3,
+          "role": "outline",
+          "plane": "screen"
+        },
+        {
+          "type": "line",
+          "x1": -0.46,
+          "y1": 0,
+          "x2": 0.46,
+          "y2": 0,
+          "role": "outline",
+          "plane": "screen"
+        },
+        {
+          "type": "line",
+          "x1": 0,
+          "y1": -0.46,
+          "x2": 0,
+          "y2": 0.46,
+          "role": "outline",
+          "plane": "screen"
+        }
+      ]
+    },
+    "FLOOR_SYMBOL": {
+      "name": "바닥 / 벽 관통 표기",
+      "mark": true,
+      "elements": [
+        {
+          "type": "line",
+          "x1": -1.0,
+          "y1": 0,
+          "x2": 1.0,
+          "y2": 0,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.8,
+          "y1": 0,
+          "x2": -1.0,
+          "y2": -0.3,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": -0.4,
+          "y1": 0,
+          "x2": -0.6,
+          "y2": -0.3,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.0,
+          "y1": 0,
+          "x2": -0.2,
+          "y2": -0.3,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.4,
+          "y1": 0,
+          "x2": 0.2,
+          "y2": -0.3,
+          "role": "outline"
+        },
+        {
+          "type": "line",
+          "x1": 0.8,
+          "y1": 0,
+          "x2": 0.6,
+          "y2": -0.3,
+          "role": "outline"
+        }
+      ]
+    },
+    "CONTINUATION": {
+      "name": "연속(다음 시트/라인) 화살표",
+      "mark": true,
+      "elements": [
+        {
+          "type": "polygon",
+          "points": [
+            {
+              "x": -0.6,
+              "y": -0.34
+            },
+            {
+              "x": 0.2,
+              "y": -0.34
+            },
+            {
+              "x": 0.6,
+              "y": 0
+            },
+            {
+              "x": 0.2,
+              "y": 0.34
+            },
+            {
+              "x": -0.6,
+              "y": 0.34
+            }
+          ],
+          "role": "outline"
+        }
+      ]
+    }
+  }
+}

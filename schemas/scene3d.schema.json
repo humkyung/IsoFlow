@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://isoflow.atools.co.kr/schemas/scene3d.schema.json",
+  "title": "IsoFlow Scene3D",
+  "description": "PCF/IDF 배관 모델의 3D 뷰어 계약. src/types/scene3d.ts 와 동기화해야 한다. 백엔드는 형상 종류와 좌표만 보내고 지오메트리는 프론트가 만든다.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "units", "origin", "bounds", "pipeline", "components"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "id": { "type": "string", "minLength": 1 },
+    "units": { "const": "mm" },
+    "origin": {
+      "description": "리베이스 오프셋(mm). 로컬좌표 + origin = 원본 플랜트 좌표",
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "bounds": {
+      "description": "로컬 좌표 기준 경계 상자 [minX,minY,minZ,maxX,maxY,maxZ]",
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 6,
+      "maxItems": 6
+    },
+    "pipeline": { "$ref": "#/$defs/pipelineInfo" },
+    "components": { "type": "array", "items": { "$ref": "#/$defs/component" } },
+    "materials": {
+      "description": "item-code → 설명",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "pipelineInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lineNumber": { "type": "string" },
+        "pipingSpec": { "type": "string" },
+        "nominalClass": { "type": "string" },
+        "area": { "type": "string" },
+        "revision": { "type": "string" },
+        "attrs": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "component": {
+      "type": "object",
+      "required": ["id", "type", "rawKeyword", "shape", "ports"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string" },
+        "rawKeyword": { "type": "string" },
+        "shape": {
+          "description": "프론트가 만들 지오메트리 종류. 엔진이 결정한다",
+          "enum": [
+            "PIPE", "ELBOW", "TEE", "CROSS", "OLET", "REDUCER", "BODY",
+            "VALVE_ANGLE", "VALVE_BUTTERFLY", "VALVE_GATE", "VALVE_GLOBE", "VALVE_BALL",
+            "VALVE_CHECK", "VALVE_PLUG", "NONE"
+          ]
+        },
+        "ports": { "type": "array", "items": { "$ref": "#/$defs/port" } },
+        "skey": { "type": "string" },
+        "itemCode": { "type": "string" },
+        "description": { "type": "string" },
+        "weight": { "type": "number" },
+        "angleDeg": { "type": "number" },
+        "flatDirection": {
+          "description": "편심 리듀서의 평평한 면 방향. 배관 좌표계는 Z-up 이므로 UP=+Z, DOWN=-Z. 없으면 동심으로 그린다",
+          "enum": ["UP", "DOWN"]
+        },
+        "spindleDirection": {
+          "description": "밸브 스템이 향하는 방위 (PCF SPINDLE-DIRECTION). EAST=+X, NORTH=+Y, UP=+Z",
+          "enum": ["NORTH", "SOUTH", "EAST", "WEST", "UP", "DOWN"]
+        },
+        "flowToEnd": {
+          "description": "유동이 향하는 END 포트의 ordinal. PCF FLOW 규약은 엔진이 흡수하고 포트 번호로만 내려온다",
+          "type": "integer",
+          "minimum": 0
+        },
+        "attrs": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "port": {
+      "type": "object",
+      "required": ["kind", "ordinal", "p"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["END", "CENTRE", "BRANCH1", "BRANCH2", "COORD"] },
+        "ordinal": { "type": "integer", "minimum": 0 },
+        "p": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "bore": { "type": "number", "exclusiveMinimum": 0 },
+        "endType": { "type": "string" },
+        "joint": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+/* index.css — Tailwind v4 진입 스타일. 다크 모드 variant와 전역 기본값을 정의한다 */
+@import 'tailwindcss';
+
+/* .dark 클래스 기반 다크 모드 토글 (Tailwind v4 custom variant) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Malgun Gothic', sans-serif;
+  overflow: hidden; /* 뷰어가 전체 화면을 차지하므로 문서 스크롤을 막는다 */
+}

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "isoflow-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 9100
+    },
+    {
+      "name": "isoflow-api",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd backend && .\\gradlew.bat bootRun --args=\"--spring.profiles.active=dev-nodb\""],
+      "port": 8290
+    }
+  ]
+}

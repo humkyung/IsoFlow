@@ -1,0 +1,43 @@
+# application.yml — IsoFlow 백엔드 기본 설정. DB 스키마 권위는 Flyway 마이그레이션이다.
+server:
+  port: 8290
+
+spring:
+  application:
+    name: isoflow-backend
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/isoflow
+    username: ${ISOFLOW_DB_USER:postgres}
+    password: ${ISOFLOW_DB_PASSWORD:Gmarud100$}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    # 스키마는 Flyway 가 만든다. JPA 는 관여하지 않는다.
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # 운영 중이던 DB 도 받아들일 수 있도록 베이스라인 허용
+    baseline-on-migrate: true
+
+  servlet:
+    multipart:
+      # PCF/IDF 다중 업로드 — 라인 수가 많은 프로젝트를 한 번에 올릴 수 있게 여유를 둔다
+      max-file-size: 64MB
+      max-request-size: 512MB
+
+isoflow:
+  storage:
+    # 업로드된 원본 PCF/IDF 저장 위치
+    root: ${ISOFLOW_STORAGE_ROOT:./data/storage}
+
+logging:
+  level:
+    co.atools.isoflow: DEBUG

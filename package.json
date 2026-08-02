@@ -1,0 +1,38 @@
+{
+  "name": "isoflow",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "IsoFlow — PCF/IDF 를 읽어 배관 등각도(Isometric Drawing)를 자동 생성하는 웹 애플리케이션",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "symbols:validate": "python backend/src/test/resources/tools/validate_symbol_set.py",
+    "symbols:sheet": "python backend/src/test/resources/tools/render_symbol_sheet.py docs/symbol-sheet.svg"
+  },
+  "dependencies": {
+    "i18next": "^24.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-i18next": "^15.4.0",
+    "react-icons": "^5.6.0",
+    "three": "^0.171.0",
+    "troika-three-text": "^0.52.4",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.20.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.171.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vitest": "^3.2.7"
+  }
+}

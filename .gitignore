@@ -1,0 +1,35 @@
+# 의존성 / 빌드 산출물
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Gradle / Java
+backend/build/
+backend/.gradle/
+backend/bin/
+backend/out/
+
+# JVM 크래시 덤프 (일회성 진단 산출물)
+hs_err_pid*.log
+replay_pid*.log
+
+# 로컬 데이터 / 업로드 저장소
+backend/data/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# 파이썬 도구
+__pycache__/
+*.pyc
+
+# OS
+Thumbs.db
+.DS_Store
+
+# 로컬 환경설정 (자격증명 포함 가능)
+backend/src/main/resources/application-local.yml
+.env
+.env.local

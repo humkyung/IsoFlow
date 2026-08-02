@@ -1,0 +1,11 @@
+# application-dev-nodb.yml — PostgreSQL 없이 기동하는 개발 프로파일.
+# 뷰어/파서 작업은 DB 가 필요 없다. 영속화 기능을 붙일 때는 기본 프로파일로 돌려야 한다.
+#   실행: ./gradlew bootRun --args='--spring.profiles.active=dev-nodb'
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+  flyway:
+    enabled: false
