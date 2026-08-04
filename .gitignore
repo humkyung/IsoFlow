@@ -16,6 +16,10 @@ replay_pid*.log
 # 로컬 데이터 / 업로드 저장소
 backend/data/
 
+# 실 프로젝트 대조 코퍼스 — 발주처 좌표·장비 태그·라인번호가 들어 있어 공개 저장소에 올리면 안 된다.
+# 테스트 픽스처는 익명화 축약본만 backend/src/test/resources/ 에 넣는다.
+docs/IDF/
+
 # IDE
 .idea/
 .vscode/
