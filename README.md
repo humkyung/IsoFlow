@@ -219,8 +219,8 @@ A few things that are easy to get wrong when generating isometrics, and how IsoF
 - **Detail bubbles enlarge spacing, not symbols.** Scaling a congested region up scales the
   symbols too, leaving the overlap ratio unchanged — positions spread, symbol size stays.
 - **Unknown input is preserved, never dropped.** Unrecognised PCF keywords are kept verbatim in
-  `attrs`; unresolved values (e.g. the still-undecoded IDF bore field) raise a diagnostic instead
-  of being guessed.
+  `attrs`; unresolved values (e.g. the still-undecoded IDF `IDF-FIELD-9/10`) raise a diagnostic
+  instead of being guessed.
 
 The IDF support was reverse-engineered from real samples without a spec — the findings
 (0.01 mm coordinate scale, split elbow/tee legs, run-vs-branch detection) are written up in the

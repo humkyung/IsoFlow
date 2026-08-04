@@ -30,7 +30,10 @@ import java.util.regex.Pattern;
  * </ul>
  *
  * <p>정식 스펙 없이 실샘플에서 역공학한 것이라, 확실하지 않은 항목은
- * <b>추측해서 채우지 않고</b> 진단으로 남긴다. 특히 보어가 그렇다.
+ * <b>추측해서 채우지 않고</b> 진단으로 남긴다.
+ *
+ * <p><b>보어는 좌표 6개 바로 다음 컬럼</b>({@code head[6]}, 호칭 mm)이다.
+ * 콤마 뒤 필드를 보어로 읽던 예전 해석은 틀렸다 — 자세한 근거는 {@link IdfRecordMap} 참고.
  */
 public final class IdfParser {
 
@@ -43,15 +46,17 @@ public final class IdfParser {
     private final List<String> itemCodes = new ArrayList<>();
     private final List<String> descriptions = new ArrayList<>();
 
-    private boolean boreWarned;
-
     public static ParseResult parse(Reader reader) throws IOException {
         return new IdfParser().run(reader);
     }
 
-    /** 컴포넌트 레코드 한 줄 */
-    private record Raw(int code, Vec3 start, Vec3 end, Integer itemIndex,
-                       String boreField, String skey, Double angleDeg, int lineNo) {
+    /**
+     * 컴포넌트 레코드 한 줄.
+     * {@code boreMm} 은 다리마다 다를 수 있다 — 리듀싱 티는 런 500 / 분기 300 처럼 조각별로 실려 온다.
+     * {@code field9/field10} 은 정체를 확정하지 못한 원문 필드다(위치 기준 이름).
+     */
+    private record Raw(int code, Vec3 start, Vec3 end, Integer itemIndex, Double boreMm,
+                       String field9, String field10, String skey, Double angleDeg, int lineNo) {
         double length() {
             return start.distanceTo(end);
         }
@@ -160,7 +165,9 @@ public final class IdfParser {
         PipingComponent c = new PipingComponent(g.type, "IDF-" + g.headCode);
         c.setSourceIndex(first.lineNo());
         c.putAttr("IDF-RECORD", String.valueOf(g.headCode));
-        if (!first.boreField().isEmpty()) c.putAttr("IDF-BORE-FIELD", first.boreField());
+        // 정체를 모르는 필드도 버리지 않는다(passthrough 규약). 뜻을 추측한 이름 대신 레코드 내 위치로 부른다
+        if (!first.field9().isEmpty()) c.putAttr("IDF-FIELD-9", first.field9());
+        if (!first.field10().isEmpty()) c.putAttr("IDF-FIELD-10", first.field10());
 
         for (Raw r : g.legs) {
             if (c.skey() == null && r.skey() != null) c.setSkey(r.skey());
@@ -173,15 +180,17 @@ public final class IdfParser {
         if (g.type == ComponentType.OLET) {
             // 올렛은 모재 접속점(CENTRE) → 분기(BRANCH1) 스텁이다. 길이 0 조각은 버린다
             Raw stub = legs.isEmpty() ? first : legs.get(0);
-            c.addPort(new Port(PortKind.CENTRE, 0, stub.start(), null, null));
-            c.addPort(new Port(PortKind.BRANCH1, 0, stub.end(), null, null));
+            // 보어는 양쪽이 다르다 — 소콜렛 300X50 이면 모재 300, 분기 50.
+            // 모재 보어는 길이 0 인 머리 조각(40)에, 분기 보어는 스텁 조각(41)에 실려 있다
+            c.addPort(new Port(PortKind.CENTRE, 0, stub.start(), first.boreMm(), null));
+            c.addPort(new Port(PortKind.BRANCH1, 0, stub.end(), stub.boreMm(), null));
             pipeline.addComponent(c);
             return;
         }
         if (legs.size() <= 1) {
             Raw r = legs.isEmpty() ? first : legs.get(0);
-            c.addPort(new Port(PortKind.END, 0, r.start(), null, null));
-            c.addPort(new Port(PortKind.END, 1, r.end(), null, null));
+            c.addPort(new Port(PortKind.END, 0, r.start(), r.boreMm(), null));
+            c.addPort(new Port(PortKind.END, 1, r.end(), r.boreMm(), null));
             pipeline.addComponent(c);
             return;
         }
@@ -189,29 +198,32 @@ public final class IdfParser {
         // 여러 다리 — 공유점이 곧 모서리/분기점이다
         Vec3 hub = sharedPoint(legs);
         if (hub == null) {
-            c.addPort(new Port(PortKind.END, 0, first.start(), null, null));
-            c.addPort(new Port(PortKind.END, 1, first.end(), null, null));
+            c.addPort(new Port(PortKind.END, 0, first.start(), first.boreMm(), null));
+            c.addPort(new Port(PortKind.END, 1, first.end(), first.boreMm(), null));
             pipeline.addComponent(c);
             return;
         }
         List<Vec3> tips = new ArrayList<>();
         for (Raw r : legs) tips.add(near(r.start(), hub) ? r.end() : r.start());
 
+        // CENTRE 는 모서리/분기점일 뿐 연결점이 아니다 — 보어를 넣으면
+        // Port.isConnectable() 이 올렛의 모재 접속점으로 오인한다. 보어는 END/BRANCH 에만 싣는다
         c.addPort(new Port(PortKind.CENTRE, 0, hub, null, null));
+        // tips 는 legs 순서 그대로다 — 같은 인덱스의 다리에서 그 끝의 보어를 가져온다
         if (tips.size() == 2) {
-            c.addPort(new Port(PortKind.END, 0, tips.get(0), null, null));
-            c.addPort(new Port(PortKind.END, 1, tips.get(1), null, null));
+            c.addPort(new Port(PortKind.END, 0, tips.get(0), legs.get(0).boreMm(), null));
+            c.addPort(new Port(PortKind.END, 1, tips.get(1), legs.get(1).boreMm(), null));
         } else {
             // 3갈래 이상 — 서로 가장 반대 방향인 둘이 런, 나머지가 분기다.
             // 레코드 코드로 정하면 안 된다: 실샘플에서 런이 45+47, 분기가 46 이었다
             int[] run = mostOpposite(hub, tips);
-            c.addPort(new Port(PortKind.END, 0, tips.get(run[0]), null, null));
-            c.addPort(new Port(PortKind.END, 1, tips.get(run[1]), null, null));
+            c.addPort(new Port(PortKind.END, 0, tips.get(run[0]), legs.get(run[0]).boreMm(), null));
+            c.addPort(new Port(PortKind.END, 1, tips.get(run[1]), legs.get(run[1]).boreMm(), null));
             int branch = 0;
             for (int i = 0; i < tips.size(); i++) {
                 if (i == run[0] || i == run[1]) continue;
                 PortKind kind = branch == 0 ? PortKind.BRANCH1 : PortKind.BRANCH2;
-                c.addPort(new Port(kind, 0, tips.get(i), null, null));
+                c.addPort(new Port(kind, 0, tips.get(i), legs.get(i).boreMm(), null));
                 branch++;
             }
         }
@@ -259,14 +271,21 @@ public final class IdfParser {
         return Integer.valueOf(head);
     }
 
-    /** 레이아웃: {@code code x1 y1 z1 x2 y2 z2 gfx itemIndex, ?, boreField, SKEY, angle trailing} */
+    /**
+     * 레이아웃(4자 코드 뒤): {@code x1 y1 z1 x2 y2 z2 bore itemIndex, f9, f10, SKEY, angle trailing}
+     *
+     * <p><b>7번째 토큰({@code head[6]})이 공칭 보어(mm)</b>다 — 좌표 6개 바로 다음 자리다.
+     * 콤마 뒤 필드가 보어라고 본 예전 해석은 틀렸다(그 자리는 {@code 0/10000/1110000/1010000}
+     * 네 값뿐이고 포트 수와도 무관하다).
+     */
     private Raw readFields(int code, String line, int lineNo) {
         String body = line.substring(4);
         int comma = body.indexOf(',');
         if (comma < 0) return null;
 
         String[] head = body.substring(0, comma).trim().split("\\s+");
-        if (head.length < 7) {
+        if (head.length <= IdfRecordMap.BORE_TOKEN_INDEX) {
+            // 보어 자리까지 못 채운 레코드다 — 조용히 넘기면 반지름·BOM 이 통째로 빈다
             diag.error(DiagnosticCodes.BAD_COORDINATE, lineNo, "keyword", "IDF", "value", line.strip());
             return null;
         }
@@ -279,10 +298,13 @@ public final class IdfParser {
                 return null;
             }
         }
+        Double boreMm = readBore(code, head[IdfRecordMap.BORE_TOKEN_INDEX], lineNo);
         Integer itemIndex = head.length >= 8 ? toInt(head[7]) : null;
 
         String[] tail = body.substring(comma + 1).split(",");
-        String boreField = tail.length >= 2 ? tail[1].trim() : "";
+        // 콤마 뒤 두 필드는 정체를 확정하지 못했다 — 의미를 추측하지 말고 위치로만 부른다
+        String field9 = tail.length >= 1 ? tail[0].trim() : "";
+        String field10 = tail.length >= 2 ? tail[1].trim() : "";
         String skey = tail.length >= 3 ? tail[2].trim() : "";
         Double angle = null;
         if (tail.length >= 4) {
@@ -290,13 +312,23 @@ public final class IdfParser {
             Integer a = t.length > 0 ? toInt(t[0]) : null;
             if (a != null && a != 0) angle = a * IdfRecordMap.ANGLE_SCALE;
         }
-        // 보어 인코딩을 확정하지 못했다 — 추측해 채우면 BOM 과 3D 반지름이 조용히 틀린다
-        if (!boreField.isEmpty() && !"0".equals(boreField) && !boreWarned) {
-            boreWarned = true;
-            diag.warn(DiagnosticCodes.IDF_BORE_UNRESOLVED, lineNo, "value", boreField);
-        }
         return new Raw(code, new Vec3(v[0], v[1], v[2]), new Vec3(v[3], v[4], v[5]),
-                itemIndex, boreField, skey.isEmpty() ? null : skey, angle, lineNo);
+                itemIndex, boreMm, field9, field10, skey.isEmpty() ? null : skey, angle, lineNo);
+    }
+
+    /**
+     * 보어 토큰을 mm 로 읽는다. IDF 보어는 <b>이미 호칭 mm</b> 라 좌표 스케일(0.01)을 적용하면 안 된다.
+     *
+     * <p>보어가 없는 레코드({@code 149/151/153} 같은 참조·주기용)는 0 이 정상이므로 조용히 null 을 준다.
+     * 반대로 <b>배관 컴포넌트인데</b> 0 이거나 숫자가 아니면 진단으로 남긴다 — 이 값이 비면
+     * 3D 반지름과 BOM 사이즈가 조용히 틀어진다.
+     */
+    private Double readBore(int code, String token, int lineNo) {
+        Integer bore = toInt(token);
+        boolean isComponent = IdfRecordMap.typeOf(code) != null || IdfRecordMap.continuesComponent(code);
+        if (bore != null && bore > 0) return (double) bore;
+        if (isComponent) diag.warn(DiagnosticCodes.IDF_BORE_MISSING, lineNo, "value", token.trim());
+        return null;
     }
 
     // ─────────────────────────── 텍스트 블록 ───────────────────────────

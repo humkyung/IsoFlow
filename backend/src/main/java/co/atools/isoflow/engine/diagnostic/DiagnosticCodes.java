@@ -51,10 +51,12 @@ public final class DiagnosticCodes {
 
     // ── IDF ──
     /**
-     * IDF 의 보어 인코딩을 확정하지 못했다. 추측해서 채우면 BOM 수량과 3D 반지름이 조용히 틀리므로
-     * 값을 비워 두고 원문만 {@code IDF-BORE-FIELD} 속성에 남긴다.
+     * IDF 컴포넌트 레코드의 보어 컬럼이 비었거나(0) 숫자가 아니다.
+     * 보어가 없으면 3D 반지름과 BOM 사이즈가 조용히 틀어지므로 경고로 남긴다.
+     *
+     * <p>보어를 갖지 않는 참조·주기용 레코드(149/151/153 등)는 0 이 정상이라 대상이 아니다.
      */
-    public static final String IDF_BORE_UNRESOLVED = "IDF_BORE_UNRESOLVED";
+    public static final String IDF_BORE_MISSING = "IDF_BORE_MISSING";
     /** 이어지는 조각인데 붙일 짝을 찾지 못했다 */
     public static final String IDF_ORPHAN_LEG = "IDF_ORPHAN_LEG";
 }

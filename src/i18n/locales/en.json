@@ -115,7 +115,7 @@
     "ECCENTRIC_FLAT_UNKNOWN": "FLAT-DIRECTION of {{component}} could not be read — drawn as concentric",
     "SKEY_UNRESOLVED": "No symbol for SKEY '{{skey}}' of {{component}}",
     "COMPRESSION_SKIPPED": "Skipped length compression on axes {{axes}} due to skew segments",
-    "IDF_BORE_UNRESOLVED": "IDF bore encoding is unresolved; left empty (raw {{value}})",
+    "IDF_BORE_MISSING": "Could not read the bore column of an IDF record (raw {{value}})",
     "IDF_ORPHAN_LEG": "No matching leg found for IDF record {{record}}",
     "SHEET_SPLIT": "The drawing was split into {{sheets}} sheets"
   },

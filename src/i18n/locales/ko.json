@@ -115,7 +115,7 @@
     "ECCENTRIC_FLAT_UNKNOWN": "{{component}} 의 FLAT-DIRECTION 을 읽지 못해 동심으로 그렸습니다",
     "SKEY_UNRESOLVED": "{{component}} 의 SKEY '{{skey}}' 에 대응하는 심볼이 없습니다",
     "COMPRESSION_SKIPPED": "사선이 있어 축 {{axes}} 의 길이 압축을 건너뛰었습니다",
-    "IDF_BORE_UNRESOLVED": "IDF 보어 인코딩을 확정하지 못해 비워 두었습니다 (원문 {{value}})",
+    "IDF_BORE_MISSING": "IDF 레코드의 보어 컬럼을 읽지 못했습니다 (원문 {{value}})",
     "IDF_ORPHAN_LEG": "IDF 레코드 {{record}} 의 짝을 찾지 못했습니다",
     "SHEET_SPLIT": "도면을 {{sheets}}장으로 나눴습니다"
   },
